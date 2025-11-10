@@ -12,6 +12,7 @@ mod make_credential;
 mod types;
 mod util;
 mod webauthn;
+mod win_webauthn;
 
 // Re-export main functionality
 pub use com_registration::{add_authenticator, initialize_com_library, register_com_library};
