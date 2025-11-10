@@ -92,7 +92,14 @@ const CLEAR_CLIPBOARD_DELAY = new UserKeyDefinition(
   AUTOFILL_SETTINGS_DISK_LOCAL,
   "clearClipboardDelay",
   {
-    deserializer: (value: ClearClipboardDelaySetting) => value ?? ClearClipboardDelay.FiveMinutes,
+    deserializer: (value: ClearClipboardDelaySetting | "never" | undefined) => {
+      // Convert our storage representation of "never" back to the actual value of null
+      if (value === "never") {
+        return ClearClipboardDelay.Never; // null
+      }
+      
+      return value as ClearClipboardDelaySetting;
+    },
     clearOn: [],
   },
 );
@@ -151,7 +158,10 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
   private enableContextMenuState: GlobalState<boolean>;
   readonly enableContextMenu$: Observable<boolean>;
 
-  private clearClipboardDelayState: ActiveUserState<ClearClipboardDelaySetting>;
+  // Allow "never" as a stored value to distinguish ClearClipboardDelay.Never (null => "never") from never set (undefined)
+  private clearClipboardDelayState: ActiveUserState<ClearClipboardDelaySetting | "never">;
+  // State to store whether the clearClipboardDelay has previously been set (initialized)
+  private clearClipboardDelayInitializedState: ActiveUserState<boolean>;
   readonly clearClipboardDelay$: Observable<ClearClipboardDelaySetting>;
 
   constructor(
@@ -218,8 +228,35 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
     this.enableContextMenu$ = this.enableContextMenuState.state$.pipe(map((x) => x ?? true));
 
     this.clearClipboardDelayState = this.stateProvider.getActive(CLEAR_CLIPBOARD_DELAY);
-    this.clearClipboardDelay$ = this.clearClipboardDelayState.state$.pipe(
-      map((x) => x ?? ClearClipboardDelay.FiveMinutes),
+    this.clearClipboardDelayInitializedState = this.stateProvider.getActive(
+      new UserKeyDefinition(AUTOFILL_SETTINGS_DISK_LOCAL, "clearClipboardDelayInitialized", {
+        deserializer: (value: boolean) => value ?? false,
+        clearOn: [],
+      }),
+    );
+    this.clearClipboardDelay$ = combineLatest([
+      this.clearClipboardDelayState.state$,
+      this.clearClipboardDelayInitializedState.state$,
+    ]).pipe(
+      map(([value, initialized]) => {
+        // If never initialized and value is undefined, return FiveMinutes default
+        if (!initialized && value === undefined) {
+          return ClearClipboardDelay.FiveMinutes;
+        }
+        
+        // If initialized but value is undefined, something went wrong - return default
+        if (initialized && value === undefined) {
+          return ClearClipboardDelay.FiveMinutes;
+        }
+        
+        // Handle our special "never" case
+        if (value === "never") {
+          return ClearClipboardDelay.Never;
+        }
+        
+        // Otherwise return the stored value
+        return value as ClearClipboardDelaySetting;
+      }),
     );
   }
 
@@ -260,6 +297,14 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
   }
 
   async setClearClipboardDelay(newValue: ClearClipboardDelaySetting): Promise<void> {
-    await this.clearClipboardDelayState.update(() => newValue);
+    // Convert null (Never) to a string that can be stored/persisted properly
+    const valueToStore = newValue === null ? "never" : newValue;
+    
+    await this.clearClipboardDelayState.update(() => {
+      return valueToStore;
+    });
+    await this.clearClipboardDelayInitializedState.update(() => {
+      return true;
+    });
   }
 }
