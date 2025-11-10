@@ -21,6 +21,13 @@ import {
 import { ClearClipboardDelay, AutofillOverlayVisibility } from "../constants";
 import { ClearClipboardDelaySetting, InlineMenuVisibilitySetting } from "../types";
 
+type ClearClipboardDelayState = {
+  // The stored value, or "never" to represent ClearClipboardDelay.Never
+  value: ClearClipboardDelaySetting | "never";
+  // Whether the setting has previously been initialized/set
+  initialized: boolean;
+};
+
 const AUTOFILL_ON_PAGE_LOAD = new UserKeyDefinition(AUTOFILL_SETTINGS_DISK, "autofillOnPageLoad", {
   deserializer: (value: boolean) => value ?? false,
   clearOn: [],
@@ -88,17 +95,15 @@ const ENABLE_CONTEXT_MENU = new KeyDefinition(AUTOFILL_SETTINGS_DISK, "enableCon
   deserializer: (value: boolean) => value ?? true,
 });
 
-const CLEAR_CLIPBOARD_DELAY = new UserKeyDefinition(
+const CLEAR_CLIPBOARD_DELAY_COMBINED = new UserKeyDefinition(
   AUTOFILL_SETTINGS_DISK_LOCAL,
-  "clearClipboardDelay",
+  "clearClipboardDelayCombined",
   {
-    deserializer: (value: ClearClipboardDelaySetting | "never" | undefined) => {
-      // Convert our storage representation of "never" back to the actual value of null
-      if (value === "never") {
-        return ClearClipboardDelay.Never; // null
+    deserializer: (state: ClearClipboardDelayState | undefined) => {
+      if (!state) {
+        return { value: undefined, initialized: false };
       }
-
-      return value as ClearClipboardDelaySetting;
+      return state;
     },
     clearOn: [],
   },
@@ -158,10 +163,7 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
   private enableContextMenuState: GlobalState<boolean>;
   readonly enableContextMenu$: Observable<boolean>;
 
-  // Allow "never" as a stored value to distinguish ClearClipboardDelay.Never (null => "never") from never set (undefined)
-  private clearClipboardDelayState: ActiveUserState<ClearClipboardDelaySetting | "never">;
-  // State to store whether the clearClipboardDelay has previously been set (initialized)
-  private clearClipboardDelayInitializedState: ActiveUserState<boolean>;
+  private clearClipboardDelayState: ActiveUserState<ClearClipboardDelayState>;
   readonly clearClipboardDelay$: Observable<ClearClipboardDelaySetting>;
 
   constructor(
@@ -227,35 +229,21 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
     this.enableContextMenuState = this.stateProvider.getGlobal(ENABLE_CONTEXT_MENU);
     this.enableContextMenu$ = this.enableContextMenuState.state$.pipe(map((x) => x ?? true));
 
-    this.clearClipboardDelayState = this.stateProvider.getActive(CLEAR_CLIPBOARD_DELAY);
-    this.clearClipboardDelayInitializedState = this.stateProvider.getActive(
-      new UserKeyDefinition(AUTOFILL_SETTINGS_DISK_LOCAL, "clearClipboardDelayInitialized", {
-        deserializer: (value: boolean) => value ?? false,
-        clearOn: [],
-      }),
-    );
-    this.clearClipboardDelay$ = combineLatest([
-      this.clearClipboardDelayState.state$,
-      this.clearClipboardDelayInitializedState.state$,
-    ]).pipe(
-      map(([value, initialized]) => {
-        // If never initialized and value is undefined, return FiveMinutes default
-        if (!initialized && value === undefined) {
+    this.clearClipboardDelayState = this.stateProvider.getActive(CLEAR_CLIPBOARD_DELAY_COMBINED);
+    this.clearClipboardDelay$ = this.clearClipboardDelayState.state$.pipe(
+      map((state) => {
+        // If not yet initialized and no value, return FiveMinutes default
+        if (!state.initialized && state.value === undefined) {
           return ClearClipboardDelay.FiveMinutes;
         }
 
-        // If initialized but value is undefined, something went wrong - return default
-        if (initialized && value === undefined) {
-          return ClearClipboardDelay.FiveMinutes;
-        }
-
-        // Handle our special "never" case
-        if (value === "never") {
+        // Handle the "never" case
+        if (state.value === "never") {
           return ClearClipboardDelay.Never;
         }
 
-        // Otherwise return the stored value
-        return value as ClearClipboardDelaySetting;
+        // Return the stored value or default if something's wrong
+        return state.value ?? ClearClipboardDelay.FiveMinutes;
       }),
     );
   }
@@ -297,14 +285,10 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
   }
 
   async setClearClipboardDelay(newValue: ClearClipboardDelaySetting): Promise<void> {
-    // Convert null (Never) to a string that can be stored/persisted properly
     const valueToStore = newValue === null ? "never" : newValue;
-
-    await this.clearClipboardDelayState.update(() => {
-      return valueToStore;
-    });
-    await this.clearClipboardDelayInitializedState.update(() => {
-      return true;
-    });
+    await this.clearClipboardDelayState.update(() => ({
+      value: valueToStore,
+      initialized: true,
+    }));
   }
 }
