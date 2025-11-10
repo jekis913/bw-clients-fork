@@ -97,7 +97,7 @@ const CLEAR_CLIPBOARD_DELAY = new UserKeyDefinition(
       if (value === "never") {
         return ClearClipboardDelay.Never; // null
       }
-      
+
       return value as ClearClipboardDelaySetting;
     },
     clearOn: [],
@@ -243,17 +243,17 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
         if (!initialized && value === undefined) {
           return ClearClipboardDelay.FiveMinutes;
         }
-        
+
         // If initialized but value is undefined, something went wrong - return default
         if (initialized && value === undefined) {
           return ClearClipboardDelay.FiveMinutes;
         }
-        
+
         // Handle our special "never" case
         if (value === "never") {
           return ClearClipboardDelay.Never;
         }
-        
+
         // Otherwise return the stored value
         return value as ClearClipboardDelaySetting;
       }),
@@ -299,7 +299,7 @@ export class AutofillSettingsService implements AutofillSettingsServiceAbstracti
   async setClearClipboardDelay(newValue: ClearClipboardDelaySetting): Promise<void> {
     // Convert null (Never) to a string that can be stored/persisted properly
     const valueToStore = newValue === null ? "never" : newValue;
-    
+
     await this.clearClipboardDelayState.update(() => {
       return valueToStore;
     });
