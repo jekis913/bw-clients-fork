@@ -43,7 +43,9 @@ export class PopupSizeService {
   }
 
   async setHeight() {
-    const isInChromeTab = await BrowserPopupUtils.isInTab();
+    // In popout windows, skip the isInTab check as chrome.tabs.getCurrent() may hang
+    const isPopout = BrowserPopupUtils.inPopout(window);
+    const isInChromeTab = isPopout ? false : await BrowserPopupUtils.isInTab();
 
     /**
      * To support both browser default zoom and system default zoom, we need to take into account

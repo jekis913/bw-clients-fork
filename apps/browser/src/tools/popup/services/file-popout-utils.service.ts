@@ -7,7 +7,7 @@ import BrowserPopupUtils from "../../../platform/browser/browser-popup-utils";
 /**
  * Service for determining whether to display file popout callout messages.
  */
-@Injectable()
+@Injectable({ providedIn: "root" })
 export class FilePopoutUtilsService {
   /**
    * Creates an instance of FilePopoutUtilsService.

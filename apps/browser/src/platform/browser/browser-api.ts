@@ -49,16 +49,8 @@ export class BrowserApi {
       return false;
     }
 
-    // these are all properties on externally initiated messages, not internal ones
-    if (
-      "tab" in sender ||
-      "documentId" in sender ||
-      "documentLifecycle" in sender ||
-      "frameId" in sender
-    ) {
-      return false;
-    }
-
+    // Allow extension pages even if they're in tabs (e.g., popout windows)
+    // The URL check above is sufficient to verify it's an internal extension page
     return true;
   }
 
