@@ -15,7 +15,7 @@ import { ImportFilePopoutDialogComponent } from "./import-file-popout-dialog.com
   imports: [JslibModule, CommonModule],
 })
 export class ImportFilePopoutDialogContainerComponent implements OnInit, OnDestroy {
-  private dialogRef: DialogRef | null = null;
+  private dialogRef?: DialogRef;
 
   constructor(
     private dialogService: DialogService,

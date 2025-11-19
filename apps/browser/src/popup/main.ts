@@ -20,15 +20,7 @@ if (process.env.ENV === "production") {
 }
 
 function init() {
-  platformBrowserDynamic()
-    .bootstrapModule(AppModule, {
-      providers: [],
-      ngZone: "zone.js",
-    })
-    .catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error(err);
-    });
+  void platformBrowserDynamic().bootstrapModule(AppModule);
 }
 
 init();

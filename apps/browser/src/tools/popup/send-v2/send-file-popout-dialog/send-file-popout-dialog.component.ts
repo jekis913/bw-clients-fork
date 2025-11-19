@@ -24,9 +24,9 @@ export class SendFilePopoutDialogComponent {
     await BrowserPopupUtils.openCurrentPagePopout(window);
   }
 
+  // If the user selects "cancel" when presented the dialog, navigate back to the main Send tab
   async close() {
     this.dialogService.closeAll();
-    // the current view exposes a file selector, ensure the view is popped to avoid using it outside of a popout
     await this.router.navigate(["/tabs/send"]);
   }
 }

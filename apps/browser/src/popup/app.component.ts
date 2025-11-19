@@ -91,7 +91,6 @@ export class AppComponent implements OnInit, OnDestroy {
   protected showSdkWarning = this.sdkService.client$.pipe(
     map(() => false),
     catchError(() => of(true)),
-    startWith(false), // Emit immediately so template renders
   );
 
   constructor(
