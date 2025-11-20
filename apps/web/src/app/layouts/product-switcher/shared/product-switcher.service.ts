@@ -29,7 +29,7 @@ import { Provider } from "@bitwarden/common/admin-console/models/domain/provider
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
-import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
+import { FeatureFlag, FeatureFlagValueType } from "@bitwarden/common/enums/feature-flag.enum";
 import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
@@ -150,6 +150,10 @@ export class ProductSwitcherService {
     }),
   );
 
+  removeSecretsManagerAdsFeatureFlag$ = this.configService.getFeatureFlag$(
+    FeatureFlag.SM1719_RemoveSecretsManagerAds,
+  );
+
   products$: Observable<{
     bento: ProductSwitcherItem[];
     other: ProductSwitcherItem[];
@@ -159,13 +163,15 @@ export class ProductSwitcherService {
     this.userHasSingleOrgPolicy$,
     this.route.paramMap,
     this.triggerProductUpdate$,
+    this.removeSecretsManagerAdsFeatureFlag$,
   ]).pipe(
     map(
-      ([orgs, providers, userHasSingleOrgPolicy, paramMap]: [
+      ([orgs, providers, userHasSingleOrgPolicy, paramMap, removeSecretsManagerAdsFeatureFlag, _]: [
         Organization[],
         Provider[],
         boolean,
         ParamMap,
+        FeatureFlagValueType<FeatureFlag.SM1719_RemoveSecretsManagerAds>,
         void,
       ]) => {
         // Sort orgs by name to match the order within the sidebar
@@ -213,11 +219,12 @@ export class ProductSwitcherService {
             };
 
         // Check if SM ads should be disabled for any organization
-        // SM ads are only disabled if the user is a regular User (not Admin or Owner)
-        // in an organization that has useDisableSMAdsForUsers enabled
-        const shouldDisableSMAds = orgs.some(
-          (org) => org.useDisableSMAdsForUsers && org.type === OrganizationUserType.User,
-        );
+        // SM ads are only disabled if:
+        // 1. The feature flag is enabled AND
+        // 2. The user is a regular User (not Admin or Owner) in an organization that has useDisableSMAdsForUsers enabled
+        const shouldDisableSMAds =
+          removeSecretsManagerAdsFeatureFlag &&
+          orgs.some((org) => org.useDisableSMAdsForUsers && org.type === OrganizationUserType.User);
 
         const products = {
           pm: {
