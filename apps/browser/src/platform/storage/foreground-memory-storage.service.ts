@@ -1,4 +1,4 @@
-import { Observable, Subject, filter, firstValueFrom, map, race, timer } from "rxjs";
+import { Observable, Subject, filter, firstValueFrom, map } from "rxjs";
 
 import {
   AbstractStorageService,
@@ -15,7 +15,6 @@ export class ForegroundMemoryStorageService extends AbstractStorageService {
   private _port: chrome.runtime.Port;
   private _backgroundResponses$: Observable<MemoryStoragePortMessage>;
   private updatesSubject = new Subject<StorageUpdate>();
-  private _ready: Promise<void>;
 
   get valuesRequireDeserialization(): boolean {
     return true;
@@ -36,25 +35,6 @@ export class ForegroundMemoryStorageService extends AbstractStorageService {
       map(([message]) => message),
       filter((message) => message.originator === "background"),
     );
-
-    // Wait for initialization message to ensure port is ready
-    // Add a timeout in case initialization never arrives (e.g., if BrowserApi.senderIsInternal rejects the connection)
-    const initMessage$ = this._backgroundResponses$.pipe(
-      filter((message) => message.action === "initialization"),
-    );
-
-    const timeout$ = timer(2000).pipe(map((): MemoryStoragePortMessage | null => null));
-
-    this._ready = firstValueFrom(race(initMessage$, timeout$)).then((result) => {
-      if (result === null) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          "[ForegroundMemoryStorageService] Initialization message not received within 2s. " +
-            "This may indicate the background script rejected the port connection. " +
-            "Storage operations may fail.",
-        );
-      }
-    });
 
     this._backgroundResponses$
       .pipe(
@@ -77,19 +57,15 @@ export class ForegroundMemoryStorageService extends AbstractStorageService {
   }
 
   async get<T>(key: string): Promise<T> {
-    await this._ready;
     return await this.delegateToBackground<T>("get", key);
   }
   async has(key: string): Promise<boolean> {
-    await this._ready;
     return await this.delegateToBackground<boolean>("has", key);
   }
   async save<T>(key: string, obj: T): Promise<void> {
-    await this._ready;
     await this.delegateToBackground<T>("save", key, obj);
   }
   async remove(key: string): Promise<void> {
-    await this._ready;
     await this.delegateToBackground<void>("remove", key);
   }
 
